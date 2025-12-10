@@ -1,34 +1,37 @@
-import streamlit as st
+import streamlit as st # Make sure streamlit is imported before using st.secrets
 import pandas as pd
 from datetime import datetime
 import altair as alt
-
-# --- FIREBASE SETUP ---
+import json
 import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import firestore
+from firebase_admin import credentials, firestore
 
-# Check if Firebase is already initialized to avoid errors on reload
+# --- FIREBASE SETUP (UPDATED FOR CLOUD & LOCAL) ---
 if not firebase_admin._apps:
-    # Try loading from local file (for PC) or Streamlit Secrets (for Cloud)
-    try:
-        # LOCAL: Looks for the file you downloaded
-        cred = credentials.Certificate('firebase_key.json') 
+    # 1. Try loading from Streamlit Secrets (Cloud Method)
+    if 'firebase_key' in st.secrets:
+        # We parse the secret JSON string back into a dictionary
+        key_dict = json.loads(st.secrets['firebase_key'])
+        cred = credentials.Certificate(key_dict)
         firebase_admin.initialize_app(cred)
-    except:
-        # CLOUD: If you deploy later, we use secrets (explained later)
-        # For now, if the file is missing, it will fail here.
-        pass
+    
+    # 2. If no secrets, try loading from local file (PC Method)
+    else:
+        try:
+            cred = credentials.Certificate('firebase_key.json')
+            firebase_admin.initialize_app(cred)
+        except:
+            st.error("⚠️ Firebase key not found! Check secrets or local key file.")
+            st.stop()
 
-# specific check to ensure DB is connected
+# Connect to DB
 try:
     db = firestore.client()
-except Exception as e:
-    st.error("⚠️ Could not connect to Firebase. Make sure 'firebase_key.json' is in the folder.")
+except:
+    st.error("⚠️ Database connection failed.")
     st.stop()
 
 st.set_page_config(page_title="Cloud FitTrack", page_icon="☁️", layout="wide")
-
 # --- DATABASE FUNCTIONS (REWRITTEN FOR FIREBASE) ---
 
 def add_workout(date, category, sub_type, duration, distance, pace, structure, rpe, notes):
